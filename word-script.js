@@ -7,46 +7,29 @@ document.addEventListener('DOMContentLoaded', () => {
     const nextWordLink = document.getElementById('next-word-link');
     const loadingMessage = document.getElementById('loading-message');
     const errorMessage = document.getElementById('error-message');
-    
-    // ** TUS CREDENCIALES DE LAS APIS **
+    const recordButton = document.getElementById('record-button');
+    const stopButton = document.getElementById('stop-button');
+    const recordingStatus = document.getElementById('recording-status');
+    const microphoneSection = document.querySelector('.microphone-section');
+
     const RAPIDAPI_KEY = '5d11d16b54msh31db87e7756fbfcp1d877djsnd5a71545bba5';
     const WORDSAPI_BASE_URL = 'https://wordsapiv1.p.rapidapi.com/words';
-
-    const GOOGLE_TTS_KEY = 'AIzaSyBVvNf2TO6bFPTGoUxggmHLkdimhbECPbs'; // Tu clave de Google
+    const GOOGLE_TTS_KEY = 'AIzaSyBVvNf2TO6bFPTGoUxggmHLkdimhbECPbs';
     const GOOGLE_TTS_ENDPOINT = 'https://texttospeech.googleapis.com/v1/text:synthesize';
+    
+    // ** NUEVA CLAVE Y ENDPOINT PARA SPEECH-TO-TEXT **
+    const GOOGLE_STT_KEY = 'AIzaSyDxVl63RoaIwTtO5UaLPYnMoqoj2K8XtL4';
+    const GOOGLE_STT_ENDPOINT = 'https://speech.googleapis.com/v1/speech:recognize';
 
-    let currentWord = ''; // Variable para almacenar la palabra actual
+    let currentWord = '';
+    let mediaRecorder;
+    let audioChunks = [];
 
     const getWordFromUrl = () => {
         const urlParams = new URLSearchParams(window.location.search);
         return urlParams.get('q');
     };
-
-    // Nueva función para generar el audio con la API de Google
-    const fetchGoogleAudio = async (text) => {
-        const response = await fetch(`${GOOGLE_TTS_ENDPOINT}?key=${GOOGLE_TTS_KEY}`, {
-            method: 'POST',
-            headers: {
-                'Content-Type': 'application/json'
-            },
-            body: JSON.stringify({
-                input: { text: text },
-                voice: { languageCode: 'en-US', name: 'en-US-Wavenet-D' },
-                audioConfig: { audioEncoding: 'MP3' }
-            })
-        });
-
-        const data = await response.json();
-        const audioContent = data.audioContent;
-        
-        // Convertir el audio de base64 a un blob y luego a una URL de objeto
-        const audioBlob = b64toBlob(audioContent, 'audio/mp3');
-        const audioUrl = URL.createObjectURL(audioBlob);
-
-        return audioUrl;
-    };
     
-    // Función para convertir Base64 a Blob
     const b64toBlob = (b64Data, contentType = '', sliceSize = 512) => {
         const byteCharacters = atob(b64Data);
         const byteArrays = [];
@@ -60,6 +43,60 @@ document.addEventListener('DOMContentLoaded', () => {
             byteArrays.push(byteArray);
         }
         return new Blob(byteArrays, { type: contentType });
+    };
+
+    const fetchGoogleAudio = async (text) => {
+        const response = await fetch(`${GOOGLE_TTS_ENDPOINT}?key=${GOOGLE_TTS_KEY}`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+                input: { text: text },
+                voice: { languageCode: 'en-US', name: 'en-US-Wavenet-D' },
+                audioConfig: { audioEncoding: 'MP3' }
+            })
+        });
+        const data = await response.json();
+        const audioContent = data.audioContent;
+        const audioBlob = b64toBlob(audioContent, 'audio/mp3');
+        return URL.createObjectURL(audioBlob);
+    };
+
+    // ** NUEVA FUNCIÓN PARA TRANSCRIPCIÓN DE VOZ **
+    const transcribeAudio = async (audioBlob) => {
+        try {
+            const audioBuffer = await audioBlob.arrayBuffer();
+            const base64Audio = btoa(String.fromCharCode(...new Uint8Array(audioBuffer)));
+
+            const response = await fetch(`${GOOGLE_STT_ENDPOINT}?key=${GOOGLE_STT_KEY}`, {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json'
+                },
+                body: JSON.stringify({
+                    config: {
+                        encoding: 'WEBM_OPUS',
+                        sampleRateHertz: 48000,
+                        languageCode: 'en-US',
+                        enableAutomaticPunctuation: false,
+                        model: 'default'
+                    },
+                    audio: {
+                        content: base64Audio
+                    }
+                })
+            });
+
+            const data = await response.json();
+            if (data.results && data.results.length > 0) {
+                return data.results[0].alternatives[0].transcript;
+            } else {
+                return null;
+            }
+
+        } catch (err) {
+            console.error('Error in transcription:', err);
+            return null;
+        }
     };
 
     const fetchWordData = async (word) => {
@@ -87,7 +124,7 @@ document.addEventListener('DOMContentLoaded', () => {
             }
 
             const data = await response.json();
-            currentWord = data.word; // Guardar la palabra actual
+            currentWord = data.word;
             
             wordTitle.textContent = currentWord;
             document.getElementById('page-title').textContent = `${currentWord} - Pronunciation`;
@@ -98,7 +135,7 @@ document.addEventListener('DOMContentLoaded', () => {
             }
             
             phoneticText.textContent = `/${phonetic}/`;
-            playAudioButton.style.display = 'block'; // Mostrar el botón de audio
+            playAudioButton.style.display = 'block';
 
             examplesList.innerHTML = '';
             let foundExamples = false;
@@ -140,6 +177,61 @@ document.addEventListener('DOMContentLoaded', () => {
             console.error('Error playing audio:', error);
         } finally {
             playAudioButton.disabled = false;
+        }
+    });
+
+    recordButton.addEventListener('click', async () => {
+        try {
+            const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+            mediaRecorder = new MediaRecorder(stream);
+            
+            mediaRecorder.ondataavailable = (e) => {
+                audioChunks.push(e.data);
+            };
+
+            mediaRecorder.onstop = async () => {
+                const audioBlob = new Blob(audioChunks, { type: 'audio/webm; codecs=opus' });
+                audioChunks = [];
+                recordingStatus.textContent = 'Processing...';
+
+                // ** NUEVA LÓGICA: Enviar a la API de Voz a Texto **
+                const transcribedText = await transcribeAudio(audioBlob);
+
+                if (transcribedText) {
+                    // Lógica de comparación de pronunciación
+                    if (transcribedText.toLowerCase().trim() === currentWord.toLowerCase().trim()) {
+                        recordingStatus.textContent = `Correct! You said: "${transcribedText}"`;
+                        recordingStatus.style.color = '#2ecc71';
+                    } else {
+                        recordingStatus.textContent = `Incorrect. You said: "${transcribedText}". Try again.`;
+                        recordingStatus.style.color = '#e74c3c';
+                    }
+                } else {
+                    recordingStatus.textContent = 'Could not understand. Please try again.';
+                    recordingStatus.style.color = '#e74c3c';
+                }
+                
+                recordButton.classList.remove('hidden');
+                stopButton.classList.add('hidden');
+                stream.getTracks().forEach(track => track.stop()); // Detener el micrófono
+            };
+
+            mediaRecorder.start();
+            recordingStatus.textContent = 'Recording...';
+            recordingStatus.style.color = '#3498db';
+            recordButton.classList.add('hidden');
+            stopButton.classList.remove('hidden');
+
+        } catch (err) {
+            console.error('Error accessing microphone:', err);
+            recordingStatus.textContent = 'Error accessing microphone. Please allow access.';
+            recordingStatus.style.color = '#e74c3c';
+        }
+    });
+
+    stopButton.addEventListener('click', () => {
+        if (mediaRecorder && mediaRecorder.state !== 'inactive') {
+            mediaRecorder.stop();
         }
     });
 
