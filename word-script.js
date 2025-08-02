@@ -8,11 +8,58 @@ document.addEventListener('DOMContentLoaded', () => {
     const loadingMessage = document.getElementById('loading-message');
     const errorMessage = document.getElementById('error-message');
     
-    const API_BASE_URL = 'https://api.dictionaryapi.dev/api/v2';
-    
+    // ** TUS CREDENCIALES DE LAS APIS **
+    const RAPIDAPI_KEY = '5d11d16b54msh31db87e7756fbfcp1d877djsnd5a71545bba5';
+    const WORDSAPI_BASE_URL = 'https://wordsapiv1.p.rapidapi.com/words';
+
+    const GOOGLE_TTS_KEY = 'AIzaSyBVvNf2TO6bFPTGoUxggmHLkdimhbECPbs'; // Tu clave de Google
+    const GOOGLE_TTS_ENDPOINT = 'https://texttospeech.googleapis.com/v1/text:synthesize';
+
+    let currentWord = ''; // Variable para almacenar la palabra actual
+
     const getWordFromUrl = () => {
         const urlParams = new URLSearchParams(window.location.search);
         return urlParams.get('q');
+    };
+
+    // Nueva función para generar el audio con la API de Google
+    const fetchGoogleAudio = async (text) => {
+        const response = await fetch(`${GOOGLE_TTS_ENDPOINT}?key=${GOOGLE_TTS_KEY}`, {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json'
+            },
+            body: JSON.stringify({
+                input: { text: text },
+                voice: { languageCode: 'en-US', name: 'en-US-Wavenet-D' },
+                audioConfig: { audioEncoding: 'MP3' }
+            })
+        });
+
+        const data = await response.json();
+        const audioContent = data.audioContent;
+        
+        // Convertir el audio de base64 a un blob y luego a una URL de objeto
+        const audioBlob = b64toBlob(audioContent, 'audio/mp3');
+        const audioUrl = URL.createObjectURL(audioBlob);
+
+        return audioUrl;
+    };
+    
+    // Función para convertir Base64 a Blob
+    const b64toBlob = (b64Data, contentType = '', sliceSize = 512) => {
+        const byteCharacters = atob(b64Data);
+        const byteArrays = [];
+        for (let offset = 0; offset < byteCharacters.length; offset += sliceSize) {
+            const slice = byteCharacters.slice(offset, offset + sliceSize);
+            const byteNumbers = new Array(slice.length);
+            for (let i = 0; i < slice.length; i++) {
+                byteNumbers[i] = slice.charCodeAt(i);
+            }
+            const byteArray = new Uint8Array(byteNumbers);
+            byteArrays.push(byteArray);
+        }
+        return new Blob(byteArrays, { type: contentType });
     };
 
     const fetchWordData = async (word) => {
@@ -20,7 +67,13 @@ document.addEventListener('DOMContentLoaded', () => {
         errorMessage.classList.add('hidden');
         
         try {
-            const response = await fetch(`${API_BASE_URL}/entries/en/${word}`);
+            const response = await fetch(`${WORDSAPI_BASE_URL}/${word}`, {
+                method: 'GET',
+                headers: {
+                    'X-RapidAPI-Host': 'wordsapiv1.p.rapidapi.com',
+                    'X-RapidAPI-Key': RAPIDAPI_KEY
+                }
+            });
 
             if (!response.ok) {
                 if (response.status === 404) {
@@ -34,42 +87,30 @@ document.addEventListener('DOMContentLoaded', () => {
             }
 
             const data = await response.json();
-            const wordData = data[0];
+            currentWord = data.word; // Guardar la palabra actual
             
-            // Actualizar el título de la palabra y el título de la página
-            wordTitle.textContent = wordData.word;
-            document.getElementById('page-title').textContent = `${wordData.word} - Pronunciation`;
+            wordTitle.textContent = currentWord;
+            document.getElementById('page-title').textContent = `${currentWord} - Pronunciation`;
             
             let phonetic = '';
-            let audioUrl = '';
-
-            // ** Lógica mejorada: Buscar la primera pronunciación con audio en todo el array **
-            if (wordData.phonetics && wordData.phonetics.length > 0) {
-                const phoneticWithAudio = wordData.phonetics.find(p => p.audio && p.text);
-                if (phoneticWithAudio) {
-                    phonetic = phoneticWithAudio.text;
-                    audioUrl = phoneticWithAudio.audio;
-                }
+            if (data.pronunciation && data.pronunciation.all) {
+                phonetic = data.pronunciation.all;
             }
             
-            phoneticText.textContent = phonetic;
-            audioPlayer.src = audioUrl;
+            phoneticText.textContent = `/${phonetic}/`;
+            playAudioButton.style.display = 'block'; // Mostrar el botón de audio
 
-            // Manejar las oraciones de ejemplo
-            examplesList.innerHTML = ''; // Limpiar ejemplos previos
+            examplesList.innerHTML = '';
             let foundExamples = false;
-
-            // ** Lógica mejorada: Recorrer todas las definiciones para encontrar ejemplos **
-            if (wordData.meanings && wordData.meanings.length > 0) {
-                wordData.meanings.forEach(meaning => {
-                    if (meaning.definitions && meaning.definitions.length > 0) {
-                        meaning.definitions.forEach(definition => {
-                            if (definition.example) {
-                                const li = document.createElement('li');
-                                li.textContent = definition.example;
-                                examplesList.appendChild(li);
-                                foundExamples = true;
-                            }
+            
+            if (data.results && data.results.length > 0) {
+                data.results.forEach(result => {
+                    if (result.examples && result.examples.length > 0) {
+                        result.examples.forEach(example => {
+                            const li = document.createElement('li');
+                            li.textContent = example;
+                            examplesList.appendChild(li);
+                            foundExamples = true;
                         });
                     }
                 });
@@ -89,11 +130,16 @@ document.addEventListener('DOMContentLoaded', () => {
         }
     };
     
-    playAudioButton.addEventListener('click', () => {
-        if (audioPlayer.src) {
+    playAudioButton.addEventListener('click', async () => {
+        playAudioButton.disabled = true;
+        try {
+            const audioUrl = await fetchGoogleAudio(currentWord);
+            audioPlayer.src = audioUrl;
             audioPlayer.play();
-        } else {
-            alert('No audio available for this word.');
+        } catch (error) {
+            console.error('Error playing audio:', error);
+        } finally {
+            playAudioButton.disabled = false;
         }
     });
 
