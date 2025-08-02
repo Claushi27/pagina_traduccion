@@ -1,0 +1,65 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Pronunciation Guide</title>
+    <link rel="stylesheet" href="style.css">
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@400;600&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+</head>
+<body>
+
+    <header class="header">
+        <nav class="navbar">
+            <a href="index.html" class="logo">Pronunciation Hub</a>
+            <ul class="nav-links">
+                <li><a href="#">Dictionary</a></li>
+                <li><a href="#">Quiz</a></li>
+                <li><a href="#">Community</a></li>
+            </ul>
+        </nav>
+    </header>
+
+    <main class="main-content">
+        <section class="hero-section">
+            <div class="hero-text">
+                <h1>Your guide to perfect pronunciation</h1>
+                <p>Search any word to hear its correct pronunciation.</p>
+            </div>
+            <div class="search-container">
+                <input type="text" id="word-input" placeholder="Search for a word..." autocomplete="off">
+                <button id="search-button">
+                    <i class="fas fa-search"></i>
+                </button>
+            </div>
+            <div id="autocomplete-results"></div>
+        </section>
+
+        <section class="results-section hidden" id="results-section">
+            </section>
+
+        <section class="trending-section">
+            <h2>Trending Words</h2>
+            <div class="trending-words-container">
+                <div class="trending-item">
+                    <span class="trending-word">Hello</span>
+                    <button class="play-button-small"><i class="fas fa-volume-up"></i></button>
+                </div>
+                <div class="trending-item">
+                    <span class="trending-word">World</span>
+                    <button class="play-button-small"><i class="fas fa-volume-up"></i></button>
+                </div>
+                <div class="trending-item">
+                    <span class="trending-word">Developer</span>
+                    <button class="play-button-small"><i class="fas fa-volume-up"></i></button>
+                </div>
+            </div>
+        </section>
+    </main>
+
+    <script src="script.js"></script>
+</body>
+</html>

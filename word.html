@@ -1,0 +1,61 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title id="page-title">Word Details</title>
+    <link rel="stylesheet" href="style.css">
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@400;600&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+</head>
+<body>
+
+    <header class="header">
+        <nav class="navbar">
+            <a href="index.html" class="logo">Pronunciation Hub</a>
+            <ul class="nav-links">
+                <li><a href="#">Dictionary</a></li>
+                <li><a href="#">Quiz</a></li>
+                <li><a href="#">Community</a></li>
+            </ul>
+        </nav>
+    </header>
+
+    <main class="main-content">
+        <section class="word-details-section">
+            <h1 id="word-title"></h1>
+            
+            <div class="pronunciation-details">
+                <span id="phonetic-text" class="phonetic-text"></span>
+                <button id="play-audio-button" class="play-button">
+                    <i class="fas fa-volume-up"></i>
+                </button>
+            </div>
+
+            <div class="microphone-section">
+                <p>Record your pronunciation:</p>
+                <button id="record-button" class="record-button"><i class="fas fa-microphone"></i></button>
+            </div>
+            
+            <div class="examples-section">
+                <h2>Example Sentences</h2>
+                <ul id="examples-list">
+                    </ul>
+            </div>
+            
+            <div class="next-word-section">
+                <h2>Next Word to Study</h2>
+                <a href="#" id="next-word-link"></a>
+            </div>
+        </section>
+
+        <p id="loading-message" class="hidden">Loading...</p>
+        <p id="error-message" class="hidden"></p>
+    </main>
+
+    <audio id="audio-player" src=""></audio>
+    <script src="word-script.js"></script>
+</body>
+</html>
